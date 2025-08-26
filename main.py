@@ -247,7 +247,6 @@ async def stream_query(request: QueryRequest, user: Dict = Depends(verify_api_ke
 
     return StreamingResponse(stream_response(), media_type="text/event-stream")
 
-
 if __name__ == "__main__":
     print("Starting Financial AI Agent API...")
     uvicorn.run(app, host="0.0.0.0", port=8000)

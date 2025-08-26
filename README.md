@@ -20,7 +20,7 @@ It integrates Google Gemini with LangGraph and LangChain tools to provide insigh
 ## Requirements
 
 * Python 3.9+
-* Google API Key for Gemini models
+* Google API Key for Gemini models.
 * Dependencies listed in `requirements.txt`
 
 ---
