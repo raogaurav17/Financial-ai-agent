@@ -150,5 +150,3 @@ Streams intermediate tool results and the final response as Server-Sent Events (
 This project is licensed under the Apache-2.0 License.
 
 ---
-
-Do you want me to also create a **requirements.txt** file for this project so anyone can install and run it immediately?
