@@ -33,7 +33,12 @@ and ambiguous multi-step questions.
 ```text
 .
 ├── backend/
-│   ├── main.py             # FastAPI API, finance services, LangGraph agent
+│   ├── main.py             # Thin FastAPI application and route mapping
+│   ├── config.py           # Environment configuration and development defaults
+│   ├── models.py           # Request and response types
+│   ├── auth.py             # Development API-key authentication
+│   ├── finance.py          # Shared deterministic finance services and tools
+│   ├── agent.py            # Optional, lazily initialized LangGraph/Gemini agent
 │   ├── pyproject.toml      # Python project dependencies
 │   ├── requirements.txt
 │   └── .env.example        # Create locally; never commit secrets
@@ -73,7 +78,7 @@ can call the existing finance tools and then explain the result.
 
 - Python 3.11+
 - Node.js 18+
-- A Google Gemini API key for LLM-backed requests
+- A Google Gemini API key for LLM-backed requests (optional for deterministic requests)
 - Network access to Yahoo Finance
 
 ## Backend Setup
@@ -91,6 +96,9 @@ Create `backend/.env`:
 
 ```env
 GOOGLE_API_KEY=your_google_api_key_here
+# Optional overrides; development defaults are used when omitted.
+STANDARD_API_KEY=my-secret-standard-key
+PREMIUM_API_KEY=my-secret-premium-key
 ```
 
 Start the API:
@@ -216,7 +224,9 @@ Compare the risk of AAPL and MSFT
 
 - `401`: missing or invalid API key
 - `403`: premium operation requested with a standard key
-- `500`: finance provider, model, or tool execution failure
+- `400`: missing, blank, or overlong query
+- `502`: finance provider or known service failure
+- `503`: an LLM request was made without `GOOGLE_API_KEY`
 
 Finance-provider failures are surfaced by the API rather than silently
 converted into successful-looking responses.
