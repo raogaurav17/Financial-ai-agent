@@ -1,303 +1,247 @@
 # Financial AI Agent
 
-Production-oriented FastAPI service that combines a tool-using LLM agent with quantitative finance utilities for market intelligence, portfolio analytics, and risk-aware decision support.
+Financial AI Agent is a full-stack financial assistant that combines
+deterministic quantitative services with an optional Google Gemini agent.
 
-## Executive Summary
+The application is intentionally designed so common finance operations do not
+consume an LLM call:
 
-This project implements an AI-powered financial assistant capable of:
+```text
+Structured request
+    -> finance service
+    -> typed result
+    -> concise response
+```
 
-- Retrieving market history, key metrics, and recent news for equities.
-- Estimating risk using annualized volatility and daily Value at Risk (VaR).
-- Forecasting short-term trends with ARIMA time-series modeling.
-- Running Monte Carlo portfolio simulations (premium tier).
-- Rebalancing portfolios via Sharpe-ratio optimization (premium tier).
-- Streaming intermediate tool outputs and final responses over SSE.
+The LLM is reserved for explanations, comparisons, summaries, recommendations,
+and ambiguous multi-step questions.
 
-The architecture is designed for extensibility: tools are registered once, orchestrated by LangGraph, and exposed through clean FastAPI endpoints.
+## Features
 
-## Core Capabilities
-
-### 1. Market Intelligence
-
-- Data source: Yahoo Finance via `yfinance`.
-- Outputs:
-   - Three-month historical summary
-   - Fundamental metrics (P/E, EPS, market cap, 52-week levels, dividend yield)
-   - Latest headline snapshot
-
-### 2. Risk Analytics
-
-- Methodology:
-   - Daily returns from 1-year adjusted close history
-   - Annualized volatility: $\sigma_{annual} = \sigma_{daily} \times \sqrt{252}$
-   - Daily VaR (95%): empirical 5th percentile of returns
-
-### 3. Trend Prediction
-
-- Model: ARIMA(5,1,0) from `statsmodels`.
-- Horizon: 30 trading-day forecast.
-- Classification: Upward/Downward based on forecast endpoint vs current price.
-
-### 4. Portfolio Simulation (Premium)
-
-- Technique: Monte Carlo simulation with equal-weight assumption.
-- Inputs: ticker list + simulation count.
-- Outputs:
-   - Expected annualized return
-   - Annualized risk (standard deviation)
-
-### 5. Portfolio Rebalancing (Premium)
-
-- Optimization objective: maximize Sharpe ratio.
-- Solver: `scipy.optimize.minimize` (SLSQP).
-- Constraints:
-   - Fully invested ($\sum w_i = 1$)
-   - Long-only bounds ($0 \le w_i \le 1$)
-
-## Architecture
-
-### Request Flow
-
-1. FastAPI endpoint receives natural-language query.
-2. API key dependency resolves user role (`standard` or `premium`).
-3. A deterministic intent parser routes quote, historical, risk, volatility/VaR,
-   trend, simulation, and rebalancing requests directly to typed finance services.
-4. Explanation, comparison, summarization, and ambiguous multi-step requests use
-   the LangGraph agent and its tools.
-5. API returns either:
-    - Single JSON response (`/query`), or
-    - Incremental SSE events (`/stream/query`).
-
-### Key Components
-
-- API layer: FastAPI + Pydantic
-- Agent orchestration: LangGraph
-- Tool calling: LangChain tools
-- LLM provider: Google Gemini (`langchain-google-genai`)
-- Quant stack: NumPy, Pandas, SciPy, Statsmodels
-- Market data provider: Yahoo Finance
-
-## Technology Stack
-
-- Python 3.12 (container baseline; 3.9+ generally compatible)
-- FastAPI / Uvicorn
-- LangChain / LangGraph
-- Google Gemini API
-- NumPy, Pandas, SciPy, Statsmodels
-- yfinance
+- Market quotes and three-month historical prices
+- Fundamental data and recent headlines through Yahoo Finance
+- Annualized volatility and empirical 95% daily VaR
+- 30-trading-day ARIMA trend forecasts
+- Monte Carlo portfolio simulation
+- Sharpe-ratio portfolio rebalancing
+- Standard and premium API access tiers
+- JSON responses and Server-Sent Events (SSE)
+- Next.js dashboard branded as **Financial AI Agent**
 
 ## Project Structure
 
 ```text
 .
-├── main.py           # FastAPI app, LangGraph workflow, tool definitions
-├── requirements.txt  # Pinned Python dependencies (UTF-16 LE encoded)
-├── Dockerfile        # Container build and runtime command
+├── backend/
+│   ├── main.py             # FastAPI API, finance services, LangGraph agent
+│   ├── pyproject.toml      # Python project dependencies
+│   ├── requirements.txt
+│   └── .env.example        # Create locally; never commit secrets
+├── frontend/
+│   ├── app/
+│   │   ├── page.tsx        # Dashboard and query experience
+│   │   ├── layout.tsx      # Metadata and root layout
+│   │   └── globals.css     # Application styling
+│   ├── package.json
+│   └── .env.example
 └── README.md
 ```
 
-## Prerequisites
+## Architecture
 
-1. Python 3.9+
-2. A Google API key with access to Gemini models
-3. Git (for source checkout)
+### Deterministic routing
 
-## Environment Variables
+The backend recognizes direct requests for:
 
-Create a `.env` file in the repository root:
+- Quotes
+- Historical data
+- Risk, volatility, and VaR
+- Trend forecasts
+- Portfolio simulation
+- Portfolio rebalancing
+
+These requests call typed finance services directly. The `/query` endpoint
+returns both a concise `response` and a structured `result`.
+
+### LLM routing
+
+Requests containing explanation, comparison, summary, recommendation, or
+multi-step reasoning language are sent through LangGraph and Gemini. The agent
+can call the existing finance tools and then explain the result.
+
+## Requirements
+
+- Python 3.11+
+- Node.js 18+
+- A Google Gemini API key for LLM-backed requests
+- Network access to Yahoo Finance
+
+## Backend Setup
+
+From the repository root:
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Create `backend/.env`:
 
 ```env
 GOOGLE_API_KEY=your_google_api_key_here
 ```
 
-The service fails fast at startup if `GOOGLE_API_KEY` is missing.
-
-## Local Development Setup
-
-### 1. Clone the Repository
-
-```bash
-git clone https://github.com/raogaurav17/Financial-ai-agent.git
-cd Financial-ai-agent
-```
-
-### 2. Create and Activate Virtual Environment
-
-Linux/macOS:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-```
-
-Windows (PowerShell):
-
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-```
-
-### 3. Install Dependencies
-
-```bash
-pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-### 4. Run the API
-
-Option A (direct script entrypoint):
-
-```bash
-python main.py
-```
-
-Option B (recommended for local dev with auto-reload):
+Start the API:
 
 ```bash
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 5. Access API Docs
+Available API documentation:
 
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
+- Swagger UI: <http://localhost:8000/docs>
+- ReDoc: <http://localhost:8000/redoc>
+
+## Frontend Setup
+
+In a second terminal, from the repository root:
+
+```bash
+cd frontend
+cp .env.example .env.local
+npm install
+npm run dev
+```
+
+Open <http://localhost:3000>.
+
+The frontend uses:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+The dashboard sends the configured API key using the `x-api-key` header. The
+default key in the UI is the standard development key; premium operations
+require the premium key.
 
 ## Authentication and Access Tiers
 
-Current implementation uses static API keys in request headers:
+The current development authentication uses static API keys:
 
-- Standard: `my-secret-standard-key`
-- Premium: `my-secret-premium-key`
+| Role | API key | Access |
+|---|---|---|
+| Standard | `my-secret-standard-key` | Market data, risk, and trends |
+| Premium | `my-secret-premium-key` | All standard features plus simulation and rebalancing |
 
 Header format:
 
 ```http
-x-api-key: <your-key>
+x-api-key: my-secret-standard-key
 ```
 
-### Feature Access Matrix
-
-| Capability | Standard | Premium |
-|---|---:|---:|
-| Market data | Yes | Yes |
-| Risk assessment | Yes | Yes |
-| Trend prediction | Yes | Yes |
-| Portfolio simulation | No | Yes |
-| Portfolio rebalancing | No | Yes |
-
-Premium-only intents (`simulate`, `rebalance`) return `403 Forbidden` for standard keys.
+This authentication is suitable only for local development. Use managed
+identity, rotating secrets, and tenant-aware authorization in production.
 
 ## API Reference
 
-### POST `/query`
+### `POST /query`
 
-Routes deterministic finance requests without an LLM and runs the agent only when
-natural-language reasoning is required.
-
-Request body:
+Request:
 
 ```json
 {
-   "query": "fetch market data for AAPL"
+  "query": "assess risk for TSLA"
 }
 ```
 
-Example cURL:
+Example:
 
 ```bash
-curl -X POST "http://localhost:8000/query" \
-   -H "Content-Type: application/json" \
-   -H "x-api-key: my-secret-standard-key" \
-   -d '{"query":"assess risk for TSLA"}'
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: my-secret-standard-key" \
+  -d '{"query":"assess risk for TSLA"}'
 ```
 
-Successful response shape:
+Deterministic response:
 
 ```json
 {
-   "response": "...concise response...",
-   "result": "...typed finance result for deterministic requests..."
+  "response": "TSLA annualized volatility is 42.10%; 95% daily VaR is -3.24%.",
+  "result": {
+    "ticker": "TSLA",
+    "annualized_volatility": 0.421,
+    "value_at_risk_95": -0.0324
+  }
 }
 ```
 
-The `result` field is included for deterministic requests and is omitted for
-LLM-backed requests.
+LLM-backed responses include `response` and omit `result`.
 
-### POST `/stream/query`
+### `POST /stream/query`
 
-Streams intermediate events and final completion via Server-Sent Events.
-
-Example cURL:
+Streams SSE events for either direct finance results or agent execution:
 
 ```bash
-curl -N -X POST "http://localhost:8000/stream/query" \
-   -H "Content-Type: application/json" \
-   -H "x-api-key: my-secret-premium-key" \
-   -d '{"query":"simulate portfolio with AAPL, MSFT, NVDA"}'
+curl -N -X POST http://localhost:8000/stream/query \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: my-secret-premium-key" \
+  -d '{"query":"simulate portfolio with AAPL, MSFT, NVDA"}'
 ```
 
-SSE event payload types:
+Event types:
 
-- `response`: agent textual output
-- `tool_result`: raw tool output
-- `done`: stream completion signal
+- `result`: structured deterministic finance result
+- `response`: concise or agent-generated text
+- `tool_result`: intermediate tool output from the agent
+- `done`: stream completion
 
-## Example Prompts
+## Example Queries
 
-- `fetch market data for AAPL`
-- `assess risk for TSLA`
-- `predict trends for GOOGL`
-- `simulate portfolio with AAPL, TSLA, MSFT`
-- `rebalance portfolio with AMZN, MSFT, NVDA`
-
-## Docker Deployment
-
-Build image:
-
-```bash
-docker build -t financial-ai-agent:latest .
-```
-
-Run container:
-
-```bash
-docker run --rm -p 8000:8000 \
-   --env GOOGLE_API_KEY=your_google_api_key_here \
-   financial-ai-agent:latest
+```text
+fetch market data for AAPL
+get historical data for MSFT
+assess risk for TSLA
+predict trends for GOOGL
+simulate portfolio with AAPL, TSLA, MSFT
+rebalance portfolio with AMZN, MSFT, NVDA
+Explain why NVDA has been volatile
+Compare the risk of AAPL and MSFT
 ```
 
 ## Error Handling
 
-Common HTTP statuses:
+- `401`: missing or invalid API key
+- `403`: premium operation requested with a standard key
+- `500`: finance provider, model, or tool execution failure
 
-- `401 Unauthorized`: missing or invalid API key
-- `403 Forbidden`: premium-only operation attempted with standard key
-- `500 Internal Server Error`: downstream/API/model/tool execution failure
+Finance-provider failures are surfaced by the API rather than silently
+converted into successful-looking responses.
 
-Tool-level failures are returned as structured error messages from the tool wrappers.
+## Development Commands
 
-## Performance and Operational Notes
+Backend:
 
-- Market and news calls are network-bound and subject to upstream latency.
-- ARIMA training and Monte Carlo simulation are compute-heavy relative to simple lookups.
-- Uvicorn worker count should be tuned based on CPU and memory profile.
-- For production hardening, add request-level timeouts, retries, and observability.
+```bash
+cd backend
+python -m py_compile main.py
+```
 
-## Security Considerations
+Frontend:
 
-Current auth is intentionally minimal for prototype speed. For production rollout, prioritize:
+```bash
+cd frontend
+npm run build
+```
 
-1. JWT or OAuth2 with rotating secrets
-2. Tenant-aware key management
-3. Rate limiting and abuse protection
-4. Structured audit logging
-5. Secret management via vault/KMS
+## Production Considerations
 
-## Recommended Production Enhancements
-
-1. Add integration and load tests for agent + tool orchestration.
-2. Introduce caching for repeated market/risk requests.
-3. Move long-running simulations to background workers.
-4. Add response schemas for tool outputs and typed contracts.
-5. Externalize role and entitlement logic to a policy layer.
+- Replace static API keys with OAuth2/JWT or a managed identity provider.
+- Add request timeouts, retries, caching, and structured audit logging.
+- Move long-running simulations to background workers.
+- Add integration tests for Yahoo Finance, deterministic routing, agent calls,
+  and SSE event ordering.
+- Keep `.env` files and API keys out of source control.
