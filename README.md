@@ -60,10 +60,11 @@ The architecture is designed for extensibility: tools are registered once, orche
 
 1. FastAPI endpoint receives natural-language query.
 2. API key dependency resolves user role (`standard` or `premium`).
-3. LangGraph agent decides whether to call tools.
-4. Tool node executes selected finance function.
-5. Agent synthesizes the final response.
-6. API returns either:
+3. A deterministic intent parser routes quote, historical, risk, volatility/VaR,
+   trend, simulation, and rebalancing requests directly to typed finance services.
+4. Explanation, comparison, summarization, and ambiguous multi-step requests use
+   the LangGraph agent and its tools.
+5. API returns either:
     - Single JSON response (`/query`), or
     - Incremental SSE events (`/stream/query`).
 
@@ -191,7 +192,8 @@ Premium-only intents (`simulate`, `rebalance`) return `403 Forbidden` for standa
 
 ### POST `/query`
 
-Runs the full agent cycle and returns a single consolidated response.
+Routes deterministic finance requests without an LLM and runs the agent only when
+natural-language reasoning is required.
 
 Request body:
 
@@ -214,9 +216,13 @@ Successful response shape:
 
 ```json
 {
-   "response": "...agent response text..."
+   "response": "...concise response...",
+   "result": "...typed finance result for deterministic requests..."
 }
 ```
+
+The `result` field is included for deterministic requests and is omitted for
+LLM-backed requests.
 
 ### POST `/stream/query`
 

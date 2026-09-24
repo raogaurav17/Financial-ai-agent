@@ -11,4 +11,6 @@ dependencies = [
     "langchain-google-genai>=4.4.0",
     "langgraph>=1.2.12",
     "pandas>=3.0.6",
+    "statsmodels>=0.15.0",
+    "yfinance>=1.7.0",
 ]
